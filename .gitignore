@@ -1,0 +1,9 @@
+# ROS build & install folders
+build/
+install/
+log/
+
+# Python cache
+__pycache__/
+*.pyc
+*.egg-info/
