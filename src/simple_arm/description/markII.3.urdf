@@ -1,5 +1,5 @@
 <?xml version='1.0' encoding='utf-8'?>
-<robot name="MarkII_urdf">
+<robot name="markII.2">
     <link name="base_link">
         <inertial>
             <origin xyz="0.035458480343119846 -6.348038499793762e-05 0.04884264658749845" rpy="0.0 0.0 0.0" />
@@ -9,16 +9,13 @@
         <visual name="base_link_visual">
             <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0" />
             <geometry>
-                <mesh filename="package://simple_arm/meshes/base_link.stl" scale="0.001 0.001 0.001" />
+                <mesh filename="meshes/base_link.stl" scale="0.001 0.001 0.001" />
             </geometry>
-            <material name="Grey">
-                <color rgba="0.1 0.1 0.1 1.0"/>
-            </material>
         </visual>
         <collision name="base_link_collision">
             <origin xyz="0.0 0.0 0.0" rpy="0.0 0.0 0.0" />
             <geometry>
-                <mesh filename="package://simple_arm/meshes/base_link.stl" scale="0.001 0.001 0.001" />
+                <mesh filename="meshes/base_link.stl" scale="0.001 0.001 0.001" />
             </geometry>
         </collision>
     </link>
@@ -31,16 +28,13 @@
         <visual name="link1_visual">
             <origin xyz="9.999929548684338e-05 0.03250000019207488 0.09200000000000054" rpy="-3.1415926535897687 -7.208216521456998e-29 -1.5707963267948966" />
             <geometry>
-                <mesh filename="package://simple_arm/meshes/link1.stl" scale="0.001 0.001 0.001" />
+                <mesh filename="meshes/link1.stl" scale="0.001 0.001 0.001" />
             </geometry>
-            <material name="Grey">
-                <color rgba="0.1 0.1 0.1 1.0"/>
-            </material>
         </visual>
         <collision name="link1_collision">
             <origin xyz="9.999929548684338e-05 0.03250000019207488 0.09200000000000054" rpy="-3.1415926535897687 -7.208216521456998e-29 -1.5707963267948966" />
             <geometry>
-                <mesh filename="package://simple_arm/meshes/link1.stl" scale="0.001 0.001 0.001" />
+                <mesh filename="meshes/link1.stl" scale="0.001 0.001 0.001" />
             </geometry>
         </collision>
     </link>
@@ -53,16 +47,13 @@
         <visual name="link2_visual">
             <origin xyz="0.055865511020663394 -0.05559347310728084 0.17090147772739467" rpy="-3.1415926535897745 4.634311136164061e-15 -1.5707963267949183" />
             <geometry>
-                <mesh filename="package://simple_arm/meshes/link2.stl" scale="0.001 0.001 0.001" />
+                <mesh filename="meshes/link2.stl" scale="0.001 0.001 0.001" />
             </geometry>
-            <material name="Grey">
-                <color rgba="0.1 0.1 0.1 1.0"/>
-            </material>
         </visual>
         <collision name="link2_collision">
             <origin xyz="0.055865511020663394 -0.05559347310728084 0.17090147772739467" rpy="-3.1415926535897745 4.634311136164061e-15 -1.5707963267949183" />
             <geometry>
-                <mesh filename="package://simple_arm/meshes/link2.stl" scale="0.001 0.001 0.001" />
+                <mesh filename="meshes/link2.stl" scale="0.001 0.001 0.001" />
             </geometry>
         </collision>
     </link>
@@ -75,16 +66,13 @@
         <visual name="link3_visual">
             <origin xyz="0.01933448921196167 0.05559347362881816 0.1709014775759369" rpy="3.1415926535897922 4.708572433932446e-16 1.5707963267949163" />
             <geometry>
-                <mesh filename="package://simple_arm/meshes/link3.stl" scale="0.001 0.001 0.001" />
+                <mesh filename="meshes/link3.stl" scale="0.001 0.001 0.001" />
             </geometry>
-            <material name="Grey">
-                <color rgba="0.1 0.1 0.1 1.0"/>
-            </material>
         </visual>
         <collision name="link3_collision">
             <origin xyz="0.01933448921196167 0.05559347362881816 0.1709014775759369" rpy="3.1415926535897922 4.708572433932446e-16 1.5707963267949163" />
             <geometry>
-                <mesh filename="package://simple_arm/meshes/link3.stl" scale="0.001 0.001 0.001" />
+                <mesh filename="meshes/link3.stl" scale="0.001 0.001 0.001" />
             </geometry>
         </collision>
     </link>
@@ -97,16 +85,13 @@
         <visual name="link4_visual">
             <origin xyz="-0.014999999876619503 -0.07860000031563046 0.03729999895692" rpy="-1.5707963267949088 1.5707963267948775 0" />
             <geometry>
-                <mesh filename="package://simple_arm/meshes/link4.stl" scale="0.001 0.001 0.001" />
+                <mesh filename="meshes/link4.stl" scale="0.001 0.001 0.001" />
             </geometry>
-            <material name="Grey">
-                <color rgba="0.1 0.1 0.1 1.0"/>
-            </material>
         </visual>
         <collision name="link4_collision">
             <origin xyz="-0.014999999876619503 -0.07860000031563046 0.03729999895692" rpy="-1.5707963267949088 1.5707963267948775 0" />
             <geometry>
-                <mesh filename="package://simple_arm/meshes/link4.stl" scale="0.001 0.001 0.001" />
+                <mesh filename="meshes/link4.stl" scale="0.001 0.001 0.001" />
             </geometry>
         </collision>
     </link>
@@ -119,16 +104,13 @@
         <visual name="link5_visual">
             <origin xyz="-0.056699999876626564 -0.03725478487650168 -0.06389999968436498" rpy="7.746581154322007e-14 -4.565358189137846e-16 1.5707963267948781" />
             <geometry>
-                <mesh filename="package://simple_arm/meshes/link5.stl" scale="0.001 0.001 0.001" />
+                <mesh filename="meshes/link5.stl" scale="0.001 0.001 0.001" />
             </geometry>
-            <material name="Grey">
-                <color rgba="0.1 0.1 0.1 1.0"/>
-            </material>
         </visual>
         <collision name="link5_collision">
             <origin xyz="-0.056699999876626564 -0.03725478487650168 -0.06389999968436498" rpy="7.746581154322007e-14 -4.565358189137846e-16 1.5707963267948781" />
             <geometry>
-                <mesh filename="package://simple_arm/meshes/link5.stl" scale="0.001 0.001 0.001" />
+                <mesh filename="meshes/link5.stl" scale="0.001 0.001 0.001" />
             </geometry>
         </collision>
     </link>
@@ -141,16 +123,13 @@
         <visual name="link6_visual">
             <origin xyz="0.0006500001233803765 -0.033158311578043026 0.07161508819313206" rpy="2.0943950946213787 2.3888183975531057e-14 -2.029786426337192e-14" />
             <geometry>
-                <mesh filename="package://simple_arm/meshes/link6.stl" scale="0.001 0.001 0.001" />
+                <mesh filename="meshes/link6.stl" scale="0.001 0.001 0.001" />
             </geometry>
-            <material name="Grey">
-                <color rgba="0.1 0.1 0.1 1.0"/>
-            </material>
         </visual>
         <collision name="link6_collision">
             <origin xyz="0.0006500001233803765 -0.033158311578043026 0.07161508819313206" rpy="2.0943950946213787 2.3888183975531057e-14 -2.029786426337192e-14" />
             <geometry>
-                <mesh filename="package://simple_arm/meshes/link6.stl" scale="0.001 0.001 0.001" />
+                <mesh filename="meshes/link6.stl" scale="0.001 0.001 0.001" />
             </geometry>
         </collision>
     </link>
@@ -163,16 +142,13 @@
         <visual name="link7_visual">
             <origin xyz="0.029158762475574633 0.018856031219078046 -0.0017643185282382491" rpy="-0.5235987678264844 -1.5707963267948672 0" />
             <geometry>
-                <mesh filename="package://simple_arm/meshes/link7.stl" scale="0.001 0.001 0.001" />
+                <mesh filename="meshes/link7.stl" scale="0.001 0.001 0.001" />
             </geometry>
-            <material name="Grey">
-                <color rgba="0.1 0.1 0.1 1.0"/>
-            </material>
         </visual>
         <collision name="link7_collision">
             <origin xyz="0.029158762475574633 0.018856031219078046 -0.0017643185282382491" rpy="-0.5235987678264844 -1.5707963267948672 0" />
             <geometry>
-                <mesh filename="package://simple_arm/meshes/link7.stl" scale="0.001 0.001 0.001" />
+                <mesh filename="meshes/link7.stl" scale="0.001 0.001 0.001" />
             </geometry>
         </collision>
     </link>
@@ -180,21 +156,18 @@
         <inertial>
             <origin xyz="0.036071437879573356 -0.018378160326630137 -0.030699742058770334" rpy="3.944304526105059e-31 7.888609052210118e-31 -5.551115123125783e-17" />
             <mass value="0.2562251290131406" />
-            <inertia ixx="0.00028109096751540406" iyy="0.00027154537408483753" izz="5.203384545490046e-05" ixy="-3.9514768753589474e-06" iyz="-4.019479975124516e-05" ixz="-4.704225929575951e-06" />
+            <inertia ixx="0.0002752824898012283" iyy="0.00027735385179900507" izz="5.203384545490046e-05" ixy="6.10910164021597e-06" iyz="3.245760471981715e-05" ixz="-2.4171379035778654e-05" />
         </inertial>
         <visual name="link8_visual">
             <origin xyz="0.040455652057477066 -0.009090003514222431 -0.03906864449898206" rpy="-2.094395094621378 1.5707963267948704 0" />
             <geometry>
-                <mesh filename="package://simple_arm/meshes/link8.stl" scale="0.001 0.001 0.001" />
+                <mesh filename="meshes/link8.stl" scale="0.001 0.001 0.001" />
             </geometry>
-            <material name="Grey">
-                <color rgba="0.1 0.1 0.1 1.0"/>
-            </material>
         </visual>
         <collision name="link8_collision">
             <origin xyz="0.040455652057477066 -0.009090003514222431 -0.03906864449898206" rpy="-2.094395094621378 1.5707963267948704 0" />
             <geometry>
-                <mesh filename="package://simple_arm/meshes/link8.stl" scale="0.001 0.001 0.001" />
+                <mesh filename="meshes/link8.stl" scale="0.001 0.001 0.001" />
             </geometry>
         </collision>
     </link>
@@ -208,7 +181,7 @@
         <origin xyz="-0.038 2.1909557501587075e-17 -0.04120000000000001" rpy="-1.5707963267949014 -1.3759121115959062e-48 2.5866422738807517e-33" />
         <parent link="link1" />
         <child link="link2" />
-        <axis xyz="-1 -9.86076131526265e-32 -2.91433543964095e-15" />
+        <axis xyz="0.9999999999999999 -9.86076131526265e-32 -2.91433543964095e-15" />
         <limit lower="-0.349066" upper="3.490659" effort="1000000" velocity="1000000" />
     </joint>
     <joint name="link2_Revolute-4" type="revolute">
@@ -222,7 +195,7 @@
         <origin xyz="0.0376 -0.008000000000000007 -0.18960000000000002" rpy="1.5707963267948966 -6.310887241768096e-30 -3.971572354158615e-60" />
         <parent link="link3" />
         <child link="link4" />
-        <axis xyz="0.0 1.0 -3.6755994903979264e-17" />
+        <axis xyz="0.0 -1.0 -3.6755994903979264e-17" />
     </joint>
     <joint name="link4_Revolute-6" type="revolute">
         <origin xyz="0.0171 -0.04360000000000001 0.0" rpy="1.5707963267948966 1.1598146964900797e-46 -3.1554436208840472e-30" />
@@ -235,7 +208,7 @@
         <origin xyz="-0.021700000000000014 4.521999999994364e-05 0.0706" rpy="-1.570796326794897 3.1554436208840472e-30 4.598010586065825e-46" />
         <parent link="link5" />
         <child link="link6" />
-        <axis xyz="0.0 1.0 -4.3859902218644406e-16" />
+        <axis xyz="0.0 -1.0 -4.3859902218644406e-16" />
     </joint>
     <joint name="link6_Slider-8" type="prismatic">
         <origin xyz="-0.012099999999999944 -0.034000140000000005 0.03283129000000003" rpy="-1.5707963267948966 0.5235987755983036 1.5707963267949092" />
@@ -244,12 +217,11 @@
         <axis xyz="1.0040277787914188e-14 1.3663471679475653e-30 0.9999999999999999" />
         <limit lower="0.0" upper="0.045" effort="1000000" velocity="1000000" />
     </joint>
-    <joint name="link7_Slider-9" type="prismatic">
+    <joint name="link6_Slider-9" type="prismatic">
         <origin xyz="0.015700000000000058 -0.034000140000000005 0.03283129000000003" rpy="-1.5707963267948966 1.0471975511965943 -1.5707963267949128" />
         <parent link="link6" />
         <child link="link8" />
-        <axis xyz="0 0 1" />
-        <limit lower="0.045" upper="0.0" effort="1000000" velocity="1000000" />
-        <mimic joint="link6_Slider-8" multiplier="1" offset="0" /> 
+        <axis xyz="-6.540341824007072e-15 -7.88860905221017e-31 0.9999999999999999" />
+        <limit lower="0.0" upper="0.045" effort="1000000" velocity="1000000" />
     </joint>
 </robot>

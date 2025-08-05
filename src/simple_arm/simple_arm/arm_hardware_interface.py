@@ -15,29 +15,34 @@ class ArmHardwareInterface(Node):
         self.system_primed = False
         # --- Joint Mappings ---
         self.single_servo_joints = {
-            'Base_link_Revolute-1': 1, 'link3_Revolute-4': 6,
-            'link4_Revolute-5': 7, 'link5_Revolute-9': 8,
-            'gripper_finger_joint': 9
+            'base_link_Revolute-1': 1, 'link3_Revolute-5': 6,
+            'link4_Revolute-6': 7, 'link5_Revolute-7': 8,
+            'link6_Slider-8': 9
         }
         self.dual_servo_joints = {
-            'link1_Revolute-2': [2, 3], 'link2_Revolute-3': [4, 5]
+            'link1_Revolute-3': [2, 3], 'link2_Revolute-4': [4, 5]
         }
         self.joint_names = list(self.single_servo_joints.keys()) + list(self.dual_servo_joints.keys())
-        
-        # --- NEW: Precise Calibration Data Structure ---
-        # You will fill this out as you complete the calibration for each joint.
+        #self.joint_names.append('link7_Slider-9')
+        # --- Calibration Data ---
         self.calibration = {
-            'Base_link_Revolute-1': {'scale': 644.9, 'offset': 2208},
-            'link1_Revolute-2': {'scale': 651, 'offset': 3052},
-            'link2_Revolute-3': {'scale': 647.2, 'offset': 1005},
-            'link3_Revolute-4': {'scale': 628, 'offset': 2570},
-            'link4_Revolute-5': {'scale': 640, 'offset': 725},
-            'link5_Revolute-9': {'scale': 654, 'offset': 593},
-            'gripper_finger_joint': {'scale': 29860, 'offset':3313}
+            'base_link_Revolute-1': {'scale': 644.9, 'offset': 3453},
+            'link1_Revolute-3': {'scale': 651, 'offset': 3072},
+            'link2_Revolute-4': {'scale': 647.2, 'offset': 985},
+            'link3_Revolute-5': {'scale': 628, 'offset': 3112},
+            'link4_Revolute-6': {'scale': 640, 'offset': 702},
+            'link5_Revolute-7': {'scale': 654, 'offset': 99},
+            'link6_Slider-8': {'scale': 28854, 'offset':2908}
         }
 
         self.joint_positions = [0.0] * len(self.joint_names)
         self.position_update_lock = threading.Lock()
+
+        self.unwrapped_positions = {name: 0.0 for name in self.joint_names}
+        self.revolutions = {name: 0 for name in self.joint_names}
+        self.last_wrapped_angles = {name: None for name in self.joint_names}
+        # Stores the last known tick value to detect wraparounds
+        self.last_tick_values = {name: None for name in self.joint_names}
 
         # --- Parameters & Driver Initialization ---
         self.declare_parameter('serial_port', '/dev/ttyUSB0')
@@ -56,9 +61,8 @@ class ArmHardwareInterface(Node):
         self.joint_command_subscriber = self.create_subscription(JointState, 'joint_commands', self.command_callback, 10)
         self.enable_service = self.create_service(Trigger, 'enable_motors', self.enable_motors_callback)
         
-        # --- Using two timers for clarity: one for reading, one for publishing ---
-        self.hardware_read_timer = self.create_timer(0.1, self.read_hardware_state_callback) # Read hardware at 10Hz
-        self.state_publish_timer = self.create_timer(0.02, self.publish_states_callback) # Publish to RViz at 50Hz
+        # --- FIX: Use a single, faster timer for reading from hardware and publishing the state ---
+        self.read_and_publish_timer = self.create_timer(0.02, self.read_and_publish_states_callback) # Operate at 50Hz
 
         self.get_logger().info("Arm Hardware Interface started.")
         self.get_logger().info("RViz will sync with the real robot's position.")
@@ -72,156 +76,211 @@ class ArmHardwareInterface(Node):
         response.message = "Motors enabled."
         return response
 
-    # --- NEW: Precise Conversion Functions ---
+    # --- Conversion Functions ---
     def _convert_rad_to_ticks(self, rad, joint_name):
+        if joint_name == 'base_link_Revolute-1':
+            # To move the joint by 'rad', the servo motor must move 3x that angle.
+            rad *= 3.0
+
         if joint_name in self.calibration:
             cal = self.calibration[joint_name]
             return int(cal['offset'] + rad * cal['scale'])
-        else: # Fallback for uncalibrated joints
+        else:
             self.get_logger().warn(f"Using fallback calibration for {joint_name}", throttle_duration_sec=5)
             return int(2048 + (rad * (2048 / 3.14159)))
 
     def _convert_ticks_to_rad(self, ticks, joint_name):
+        rad = 0.0 # Initialize
         if joint_name in self.calibration:
             cal = self.calibration[joint_name]
-            # Avoid division by zero if scale is somehow 0
-            return (ticks - cal['offset']) / cal['scale'] if cal['scale'] != 0 else 0.0
-        else: # Fallback for uncalibrated joints
-            return (ticks - 2048) * (3.14159 / 2048)
+            rad = (ticks - cal['offset']) / cal['scale'] if cal['scale'] != 0 else 0.0
+        else:
+            # Fallback for uncalibrated joints
+            rad = (ticks - 2048) * (3.14159 / 2048)
+        
+        # Apply the gearbox adjustment AFTER the initial conversion
+        if joint_name == 'base_link_Revolute-1':
+            rad /= 3.0
 
-    # Note: Gripper conversion is linear and doesn't need the same calibration
+        return rad
+
     def _convert_gripper_dist_to_ticks(self, dist):
-        min_dist, max_dist, min_ticks, max_ticks = 0.0, 0.035, 1024, 3072
+    # --- INSERT YOUR CALIBRATED VALUES HERE ---
+        min_dist, max_dist = 0.0, 0.048
+        min_ticks, max_ticks = 2903, 1518
+        
+        if max_ticks == min_ticks:
+            self.get_logger().error("Gripper 'max_ticks' and 'min_ticks' cannot be the same value!", once=True)
+            return min_ticks
+
         dist = max(min_dist, min(dist, max_dist))
         return int(min_ticks + ((dist - min_dist) / (max_dist - min_dist)) * (max_ticks - min_ticks))
 
     def _convert_ticks_to_gripper_dist(self, ticks):
-        min_dist, max_dist, min_ticks, max_ticks = 0.0, 0.035, 1024, 3072
-        ticks = max(min_ticks, min(ticks, max_ticks))
-        return min_dist + ((ticks - min_ticks) / (max_ticks - min_ticks)) * (max_dist - min_dist)
+    # --- INSERT YOUR CALIBRATED VALUES HERE ---
+        min_dist, max_dist = 0.0, 0.048
+        min_ticks, max_ticks = 2903, 1518
+        
+        if max_ticks == min_ticks:
+            self.get_logger().error("Gripper 'max_ticks' and 'min_ticks' cannot be the same value!", once=True)
+            return min_dist
+        
+        # --- FIX: This block correctly clamps the ticks even if the range is inverted ---
+        low_tick = min(min_ticks, max_ticks)
+        high_tick = max(min_ticks, max_ticks)
+        ticks = max(low_tick, min(ticks, high_tick))
+        
+        # The mathematical formula works correctly with an inverted range
+        position = min_dist + ((ticks - min_ticks) / (max_ticks - min_ticks)) * (max_dist - min_dist)
+        
+        return position
 
-    def read_hardware_state_callback(self):
-        """Reads the current position from all servos and updates the internal state."""
-        temp_positions = []
+    # --- FIX: Renamed method that now handles both reading and publishing ---
+    def read_and_publish_states_callback(self):
+        """
+        Reads servo positions, calculates a continuous unwrapped angle based on a
+        calibrated zero, and publishes the state.
+        """
+        # This is the full angular range of the base joint after the gearbox
+        # (4096 ticks / scale) / gear_ratio
+        BASE_JOINT_RANGE = 4096 / self.calibration['base_link_Revolute-1']['scale'] / 3.0
+
         for name in self.joint_names:
-            pos_value = 0.0
-            id_to_read = None
             pos_ticks = None
-
+            # Default to the last known unwrapped position if read fails
+            unwrapped_pos = self.unwrapped_positions.get(name, 0.0)
+            id_to_read = None
+            # --- 1. Read Ticks ---
             if name in self.single_servo_joints:
                 id_to_read = self.single_servo_joints[name]
-                pos_ticks = self.driver.get_position(id_to_read)
-                if pos_ticks is not None:
-                    if name == 'gripper_finger_joint':
-                        pos_value = self._convert_ticks_to_gripper_dist(pos_ticks)
-                    else:
-                        pos_value = self._convert_ticks_to_rad(pos_ticks, name)
+                pos_ticks = self.driver.get_position(self.single_servo_joints[name])
             elif name in self.dual_servo_joints:
-                id_to_read = self.dual_servo_joints[name][0]
-                pos_ticks = self.driver.get_position(id_to_read)
+                id_to_read = self.dual_servo_joints[name][0] # Use the leader servo's ID
+                pos_ticks = self.driver.get_position(self.dual_servo_joints[name][0])
+            
+            if id_to_read == 9:  # Check if the current servo is the gripper
                 if pos_ticks is not None:
-                    pos_value = self._convert_ticks_to_rad(pos_ticks, name)
+                    self.get_logger().info(
+                        f"Servo ID {id_to_read} ('{name}') Ticks: {pos_ticks}",
+                        throttle_duration_sec=1.0  # IMPORTANT: Prevents terminal spam
+                    )
+
+            if pos_ticks is None:
+                continue # Use last known value if read fails
+
+            # --- 2. Calculate the "wrapped" angle using your calibrated offset ---
+            if name == 'link6_Slider-8':
+                wrapped_pos = self._convert_ticks_to_gripper_dist(pos_ticks)
+            else:
+                wrapped_pos = self._convert_ticks_to_rad(pos_ticks, name)
+
+            # --- 3. Initialize on first run ---
+            if self.last_wrapped_angles[name] is None:
+                self.last_wrapped_angles[name] = wrapped_pos
+                unwrapped_pos = wrapped_pos # The first position is our baseline
+            else:
+                # --- 4. Detect and correct for wraparound on subsequent runs ---
+                last_wrapped = self.last_wrapped_angles[name]
+                diff = wrapped_pos - last_wrapped
+
+                # Check for a jump larger than half the full range
+                if name == 'base_link_Revolute-1':
+                    if diff > (BASE_JOINT_RANGE / 2): # e.g., jump from 0.3 to -1.7 -> diff is large and negative
+                        self.revolutions[name] -= 1
+                    elif diff < (-BASE_JOINT_RANGE / 2): # e.g., jump from -1.7 to 0.3 -> diff is large and positive
+                        self.revolutions[name] += 1
+                
+                # The final unwrapped position respects the calibrated zero AND tracks full rotations
+                if name == 'base_link_Revolute-1':
+                    unwrapped_pos = wrapped_pos + self.revolutions[name] * BASE_JOINT_RANGE
+                else: # For other joints, we still use the basic wrapped position
+                    unwrapped_pos = wrapped_pos
+                
+                self.last_wrapped_angles[name] = wrapped_pos
+
+            # --- 5. Update state and log for debugging ---
+            self.unwrapped_positions[name] = unwrapped_pos
             
-            # --- IMPORTANT FOR CALIBRATION ---
-            # Uncomment the block below and set the ID to watch a specific servo's raw tick value.
-            #if id_to_read == 4: # Example: Watch servo ID 1 (Base)
-             #    self.get_logger().info(f"ID {id_to_read} Ticks: {pos_ticks}")
             
-            temp_positions.append(pos_value)
         
-        with self.position_update_lock:
-            self.joint_positions = temp_positions
+        
+        # --- 6. Publish final, smooth joint states ---
+        msg = JointState()
+        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.frame_id = 'base_link'
+        msg.name = list(self.unwrapped_positions.keys())
+        msg.position = list(self.unwrapped_positions.values())
+        self.joint_state_publisher.publish(msg)
+
             
     def command_callback(self, msg: JointState):
-        """Receives commands and sends them to the physical hardware if enabled."""
+        """Receives commands and intelligently calculates the shortest path to the target."""
         if not self.motors_enabled:
-            self.get_logger().warn("Motors not enabled. Call /enable_motors to move the robot.", throttle_duration_sec=10)
             return
 
         commands_to_sync = {}
+        BASE_JOINT_RANGE = 4096 / self.calibration['base_link_Revolute-1']['scale'] / 3.0
         
-        # --- NEW PRIMING LOGIC ---
-        if not self.system_primed:
-            self.get_logger().info("First command after enable: syncing GUI to current robot state.")
-            # Use the last read hardware positions as the command
-            with self.position_update_lock:
-                positions_to_use = self.joint_positions
-            
-            # Use the names from the incoming message for correct ordering
-            for i, name in enumerate(self.joint_names):
-                # Find the index of this joint in the positions_to_use list
-                joint_index = self.joint_names.index(name)
-                position_rad = positions_to_use[joint_index]
+        # The priming logic can be removed if the main logic is robust.
+        # This simplifies the function.
+        for i, name in enumerate(msg.name):
+            if name not in self.joint_names:
+                continue
 
-                if name == 'gripper_finger_joint':
-                    position_ticks = self._convert_gripper_dist_to_ticks(position_rad)
-                else:
-                    position_ticks = self._convert_rad_to_ticks(position_rad, name)
+            target_wrapped_rad = msg.position[i]
+            final_rad_for_conversion = target_wrapped_rad
 
-                if name in self.single_servo_joints:
-                    servo_id = self.single_servo_joints[name]
-                    commands_to_sync[servo_id] = position_ticks
-                elif name in self.dual_servo_joints:
-                    leader_id, follower_id = self.dual_servo_joints[name]
-                    commands_to_sync[leader_id] = position_ticks
-                    commands_to_sync[follower_id] = 4095 - position_ticks
-            
-            self.system_primed = True # Mark as primed so we don't do this again
-        else:
-            # --- ORIGINAL LOGIC ---
-            # This will run for all subsequent commands
-            for i, name in enumerate(msg.name):
-                if name == 'gripper_finger_joint':
-                    position_ticks = self._convert_gripper_dist_to_ticks(msg.position[i])
-                else:
-                    position_ticks = self._convert_rad_to_ticks(msg.position[i], name)
+            # --- FIX: New shortest-path command logic for the base link ---
+            if name == 'base_link_Revolute-1':
+                current_unwrapped_rad = self.unwrapped_positions[name]
+                current_revolutions = self.revolutions[name]
 
-                if name in self.single_servo_joints:
-                    servo_id = self.single_servo_joints[name]
-                    commands_to_sync[servo_id] = position_ticks
-                elif name in self.dual_servo_joints:
-                    leader_id, follower_id = self.dual_servo_joints[name]
-                    commands_to_sync[leader_id] = position_ticks
-                    commands_to_sync[follower_id] = 4095 - position_ticks
+                # Find the target position on the current, next, and previous revolution
+                target_on_current_rev = target_wrapped_rad + current_revolutions * BASE_JOINT_RANGE
+                target_on_next_rev = target_wrapped_rad + (current_revolutions + 1) * BASE_JOINT_RANGE
+                target_on_prev_rev = target_wrapped_rad + (current_revolutions - 1) * BASE_JOINT_RANGE
+                
+                # Choose the target that is closest to our current unwrapped position
+                final_rad_for_conversion = min(
+                    [target_on_current_rev, target_on_next_rev, target_on_prev_rev],
+                    key=lambda x: abs(x - current_unwrapped_rad)
+                )
+
+            # --- Convert the final calculated radian value to ticks ---
+            if name == 'link6_Slider-8':
+                position_ticks = self._convert_gripper_dist_to_ticks(final_rad_for_conversion)
+            else:
+                position_ticks = self._convert_rad_to_ticks(final_rad_for_conversion, name)
+
+            # --- Assign ticks to servos (same as before) ---
+            if name in self.single_servo_joints:
+                servo_id = self.single_servo_joints[name]
+                commands_to_sync[servo_id] = position_ticks
+            elif name in self.dual_servo_joints:
+                leader_id, follower_id = self.dual_servo_joints[name]
+                commands_to_sync[leader_id] = position_ticks
+                commands_to_sync[follower_id] = 4095 - position_ticks
         
         if commands_to_sync:
             self.driver.sync_write_positions(commands_to_sync)
 
-    def publish_states_callback(self):
-        """Publishes the last known joint positions to /joint_states for RViz."""
-        msg = JointState()
-        msg.header = Header()
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.header.frame_id = 'Base_link'
-        msg.name = self.joint_names
-        
-        with self.position_update_lock:
-            msg.position = self.joint_positions
-
-        msg.velocity = [0.0] * len(self.joint_names)
-        msg.effort = [0.0] * len(self.joint_names)
-        self.joint_state_publisher.publish(msg)
+    # --- FIX: The old 'publish_states_callback' is no longer needed and should be deleted ---
 
     def destroy_node(self):
         """Called automatically on shutdown to clean up resources."""
         self.get_logger().info("Shutdown signal received. Disabling torque on all servos.")
         
-        # Gather all unique servo IDs from the joint mappings
-        # The joint mappings are defined in this file's __init__ method
         all_servo_ids = set(self.single_servo_joints.values())
         for ids in self.dual_servo_joints.values():
             all_servo_ids.update(ids)
             
         for servo_id in all_servo_ids:
             try:
-                # The set_torque_enable function is from the driver
                 self.driver.set_torque_enable(servo_id, False)
             except Exception as e:
                 self.get_logger().error(f"Failed to disable torque for servo {servo_id}: {e}")
         
-        # Close the serial port connection
         self.driver.close()
-        # It's important to call the parent class's method
         super().destroy_node()
 
 def main(args=None):
