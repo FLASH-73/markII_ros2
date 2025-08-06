@@ -1,0 +1,9 @@
+<library path="mark_ii_hardware_interface">
+  <class name="mark_ii_hardware_interface/MarkIIHardwareInterface"
+         type="mark_ii_hardware_interface::MarkIIHardwareInterface"
+         base_class_type="hardware_interface::SystemInterface">
+    <description>
+      ros2_control hardware interface for the MarkII arm.
+    </description>
+  </class>
+</library>

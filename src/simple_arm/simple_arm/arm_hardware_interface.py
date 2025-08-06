@@ -32,7 +32,7 @@ class ArmHardwareInterface(Node):
             'link3_Revolute-5': {'scale': 628, 'offset': 3112},
             'link4_Revolute-6': {'scale': 640, 'offset': 702},
             'link5_Revolute-7': {'scale': 654, 'offset': 99},
-            'link6_Slider-8': {'scale': 28854, 'offset':2908}
+            'link6_Slider-8': {'scale': 14427, 'offset':2908}
         }
 
         self.joint_positions = [0.0] * len(self.joint_names)
@@ -106,7 +106,7 @@ class ArmHardwareInterface(Node):
 
     def _convert_gripper_dist_to_ticks(self, dist):
     # --- INSERT YOUR CALIBRATED VALUES HERE ---
-        min_dist, max_dist = 0.0, 0.048
+        min_dist, max_dist = 0.0, 0.024
         min_ticks, max_ticks = 2903, 1518
         
         if max_ticks == min_ticks:
@@ -118,7 +118,7 @@ class ArmHardwareInterface(Node):
 
     def _convert_ticks_to_gripper_dist(self, ticks):
     # --- INSERT YOUR CALIBRATED VALUES HERE ---
-        min_dist, max_dist = 0.0, 0.048
+        min_dist, max_dist = 0.0, 0.024
         min_ticks, max_ticks = 2903, 1518
         
         if max_ticks == min_ticks:
@@ -132,7 +132,7 @@ class ArmHardwareInterface(Node):
         
         # The mathematical formula works correctly with an inverted range
         position = min_dist + ((ticks - min_ticks) / (max_ticks - min_ticks)) * (max_dist - min_dist)
-        
+        position = max(min_dist, min(position, max_dist))
         return position
 
     # --- FIX: Renamed method that now handles both reading and publishing ---

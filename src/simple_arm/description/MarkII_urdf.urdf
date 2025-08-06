@@ -252,4 +252,44 @@
         <limit lower="0.045" upper="0.0" effort="1000000" velocity="1000000" />
         <mimic joint="link6_Slider-8" multiplier="1" offset="0" /> 
     </joint>
+    <ros2_control name="MarkIIHardware" type="system">
+        <hardware>
+            <plugin>mark_ii_hardware_interface/MarkIIHardwareInterface</plugin>
+            <param name="serial_port">/dev/ttyUSB0</param>
+            <param name="baudrate">1000000</param>
+        </hardware>
+
+        <joint name="base_link_Revolute-1">
+            <command_interface name="position"/>
+            <state_interface name="position"/>
+        </joint>
+        <joint name="link1_Revolute-3">
+            <command_interface name="position"/>
+            <state_interface name="position"/>
+        </joint>
+        <joint name="link2_Revolute-4">
+            <command_interface name="position"/>
+            <state_interface name="position"/>
+        </joint>
+        <joint name="link3_Revolute-5">
+            <command_interface name="position"/>
+            <state_interface name="position"/>
+        </joint>
+        <joint name="link4_Revolute-6">
+            <command_interface name="position"/>
+            <state_interface name="position"/>
+        </joint>
+        <joint name="link5_Revolute-7">
+            <command_interface name="position"/>
+            <state_interface name="position"/>
+        </joint>
+        <joint name="link6_Slider-8">
+            <command_interface name="position"/>
+            <state_interface name="position"/>
+        </joint>
+        <joint name="link7_Slider-9">
+            <state_interface name="position"/>
+        </joint>
+    </ros2_control>
+
 </robot>
