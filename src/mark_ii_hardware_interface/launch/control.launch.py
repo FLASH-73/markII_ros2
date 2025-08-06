@@ -1,15 +1,20 @@
 from launch import LaunchDescription
-from launch.actions import RegisterEventHandler, SetEnvironmentVariable
+from launch.actions import RegisterEventHandler, DeclareLaunchArgument
 from launch.event_handlers import OnProcessExit
-from launch.substitutions import Command, FindExecutable, PathJoinSubstitution
+from launch.substitutions import Command, FindExecutable, PathJoinSubstitution, LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
+# Import for IncludeLaunchDescription
+from launch.actions import IncludeLaunchDescription
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 
 def generate_launch_description():
-    # Make libpython symbols available to C‐extensions (termios, etc)
-    preload_py = SetEnvironmentVariable(
-        name='LD_PRELOAD',
-        value='/usr/lib/x86_64-linux-gnu/libpython3.12.so'
+    # Declare a launch argument to control whether MoveIt is started
+    # This makes your launch file more flexible
+    launch_moveit_arg = DeclareLaunchArgument(
+        "launch_moveit",
+        default_value="true",
+        description="Launch MoveIt move_group node",
     )
 
     robot_description_content = Command(
@@ -52,17 +57,41 @@ def generate_launch_description():
         arguments=["-d", PathJoinSubstitution([FindPackageShare("simple_arm"), "config", "view_arm.rviz"])],
     )
 
-    # Delay RViz start until the controller_manager is ready
-    delay_rviz_after_control_node = RegisterEventHandler(
-        event_handler=OnProcessExit(
-            target_action=control_node,
-            on_exit=[rviz_node],
-        )
+    spawn_forward_controller = Node(
+        package="controller_manager",
+        executable="spawner",
+        arguments=["forward_position_controller", "-c", "/controller_manager"],
+        output="screen",
     )
 
+    # The new interactive marker node that provides the draggable marker
+    interactive_marker_node = Node(
+        package="simple_arm",
+        executable="interactive_marker_node",
+        name="interactive_marker_node",
+        output="screen",
+    )
+
+    # The MoveIt launch file
+    moveit_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution([
+                FindPackageShare('MarkII_urdf_moveit_config'),
+                'launch',
+                'moveit.launch.py'
+            ])
+        ),
+        condition_if_not_equal=LaunchConfiguration('launch_moveit', default='false')
+    )
+
+
     return LaunchDescription([
-        preload_py,
+        launch_moveit_arg,
         control_node,
         robot_state_publisher_node,
         rviz_node,
+        spawn_forward_controller,
+        # Add the new nodes to the launch description
+        interactive_marker_node,
+        moveit_launch,
     ])

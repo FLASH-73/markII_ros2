@@ -26,9 +26,9 @@ setup(
     tests_require=['pytest'],
     entry_points={
         'console_scripts': [
-            # Define your new executable
             'arm_hardware_interface = simple_arm.arm_hardware_interface:main',
             'interactive_ik_server = simple_arm.interactive_ik_server:main',
+            'interactive_marker_node = simple_arm.interactive_marker_node:main',
         ],
     },
 )

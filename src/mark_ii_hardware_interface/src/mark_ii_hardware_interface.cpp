@@ -2,14 +2,39 @@
 #include <dlfcn.h>
 #include <vector>
 #include <string>
+#include <sstream> // Required for std::stringstream
 
-#include <pybind11/embed.h>    // for gil_scoped_acquire
+#include <pybind11/embed.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/stl.h> // Required for automatic type casting
 
 namespace py = pybind11;
 
 namespace mark_ii_hardware_interface
 {
+
+// --- FIX: Correctly manage interpreter lifecycle ---
+MarkIIHardwareInterface::MarkIIHardwareInterface()
+{
+    // Force libpython into the GLOBAL symbol table
+    void * handle = dlopen(PYTHON_LIBRARY_PATH, RTLD_NOW | RTLD_GLOBAL);
+    if (!handle) {
+        RCLCPP_ERROR(rclcpp::get_logger("MarkIIHardwareInterface"),
+                    "dlopen(%s) failed: %s", PYTHON_LIBRARY_PATH, dlerror());
+    }
+    py::initialize_interpreter();
+    // Allow Python threads to be created
+    PyEval_InitThreads(); 
+}
+
+MarkIIHardwareInterface::~MarkIIHardwareInterface()
+{
+    // Acquire the GIL to safely finalize
+    py::gil_scoped_acquire acquire;
+    driver_.release();
+    py::finalize_interpreter();
+}
+
 
 hardware_interface::CallbackReturn MarkIIHardwareInterface::on_init(const hardware_interface::HardwareInfo & info)
 {
@@ -68,15 +93,56 @@ std::vector<hardware_interface::CommandInterface> MarkIIHardwareInterface::expor
     return command_interfaces;
 }
 
+
+// --- FIX: Create a new private helper function for Python initialization ---
+void MarkIIHardwareInterface::_initialize_python_driver()
+{
+    // This function assumes the GIL is already held
+    if (python_driver_initialized_) {
+        return;
+    }
+
+    RCLCPP_INFO(rclcpp::get_logger("MarkIIHardwareInterface"), "Initializing Python driver in real-time thread...");
+
+    try {
+        auto sys = py::module::import("sys");
+        const char* python_path_env = std::getenv("PYTHONPATH");
+        if (python_path_env)
+        {
+            std::string python_path_str(python_path_env);
+            std::stringstream ss(python_path_str);
+            std::string path;
+            while (std::getline(ss, path, ':')) {
+                sys.attr("path").attr("append")(path);
+            }
+        }
+        
+        auto sts_driver_module = py::module_::import("mark_ii_hardware_interface.sts_driver");
+        driver_ = sts_driver_module.attr("ServoController")(serial_port_, baudrate_);
+        RCLCPP_INFO(rclcpp::get_logger("MarkIIHardwareInterface"), "Python driver loaded and connected successfully.");
+
+        py::list all_servo_ids;
+        for(auto const& [key, val] : single_servo_joints_) all_servo_ids.append(val);
+        for(auto const& [key, val] : dual_servo_joints_) {
+            all_servo_ids.append(val[0]);
+            all_servo_ids.append(val[1]);
+        }
+        for (const auto id : all_servo_ids) {
+            driver_.attr("set_torque_enable")(id, true);
+        }
+        RCLCPP_INFO(rclcpp::get_logger("MarkIIHardwareInterface"), "Torque enabled on all servos.");
+
+        python_driver_initialized_ = true;
+
+    } catch (const py::error_already_set& e) {
+        RCLCPP_ERROR(rclcpp::get_logger("MarkIIHardwareInterface"), "Failed to initialize Python driver: %s", e.what());
+        // We don't set the flag, so it will retry on the next cycle.
+    }
+}
+
+
 hardware_interface::CallbackReturn MarkIIHardwareInterface::on_activate(const rclcpp_lifecycle::State & /*previous_state*/)
 {
-    // force libpython into the GLOBAL symbol table so termios.so can resolve PyExc_TypeError
-    void * handle = dlopen(PYTHON_LIBRARY_PATH, RTLD_NOW | RTLD_GLOBAL);
-    if (!handle) {
-        RCLCPP_WARN(rclcpp::get_logger("MarkIIHardwareInterface"),
-                    "dlopen(%s) failed: %s", PYTHON_LIBRARY_PATH, dlerror());
-    }
-    
     RCLCPP_INFO(rclcpp::get_logger("MarkIIHardwareInterface"), "Activating... Please wait.");
 
     for (size_t i = 0; i < hw_states_.size(); i++)
@@ -89,57 +155,15 @@ hardware_interface::CallbackReturn MarkIIHardwareInterface::on_activate(const rc
        }
     }
 
-    try {
-        py::initialize_interpreter();
-        auto sys = py::module::import("sys");
-
-        // --- ROBUST SOLUTION: Use the PYTHONPATH set by ROS 2 ---
-        const char* python_path_env = std::getenv("PYTHONPATH");
-        if (python_path_env)
-        {
-            // PYTHONPATH can contain multiple paths separated by ':', so we add all of them.
-            std::string python_path_str(python_path_env);
-            std::stringstream ss(python_path_str);
-            std::string path;
-            while (std::getline(ss, path, ':')) {
-                sys.attr("path").attr("append")(path);
-                RCLCPP_INFO(rclcpp::get_logger("MarkIIHardwareInterface"), "Appended to sys.path: %s", path.c_str());
-            }
-        }
-        else
-        {
-            RCLCPP_WARN(rclcpp::get_logger("MarkIIHardwareInterface"), "PYTHONPATH env variable not set. Relying on default Python paths.");
-        }
-        
-        auto sts_driver_module = py::module_::import("mark_ii_hardware_interface.sts_driver");
-        driver_ = sts_driver_module.attr("ServoController")(serial_port_, baudrate_);
-        RCLCPP_INFO(rclcpp::get_logger("MarkIIHardwareInterface"), "Python driver loaded and connected successfully.");
-
-        // Torque enabling logic...
-        py::list all_servo_ids;
-        for(auto const& [key, val] : single_servo_joints_) all_servo_ids.append(val);
-        for(auto const& [key, val] : dual_servo_joints_) {
-            all_servo_ids.append(val[0]);
-            all_servo_ids.append(val[1]);
-        }
-        for (const auto id : all_servo_ids) {
-            driver_.attr("set_torque_enable")(id, true);
-        }
-        RCLCPP_INFO(rclcpp::get_logger("MarkIIHardwareInterface"), "Torque enabled on all servos.");
-
-    } catch (const py::error_already_set& e) {
-        RCLCPP_ERROR(rclcpp::get_logger("MarkIIHardwareInterface"), "Python error: %s", e.what());
-        return hardware_interface::CallbackReturn::ERROR;
-    }
-
-    // --- FIX: Perform an initial read to populate hw_states_ ---
+    // --- FIX: Remove all python-related calls from on_activate ---
+    
+    // The initial read will now handle the first-time initialization.
     if (read(rclcpp::Time(0), rclcpp::Duration(0, 0)) != hardware_interface::return_type::OK)
     {
+        RCLCPP_ERROR(rclcpp::get_logger("MarkIIHardwareInterface"), "Initial read failed during activation.");
         return hardware_interface::CallbackReturn::ERROR;
     }
-    // Set commands to current states to avoid sudden movements
     hw_commands_ = hw_states_;
-
 
     RCLCPP_INFO(rclcpp::get_logger("MarkIIHardwareInterface"), "System successfully activated.");
     return hardware_interface::CallbackReturn::SUCCESS;
@@ -148,38 +172,49 @@ hardware_interface::CallbackReturn MarkIIHardwareInterface::on_activate(const rc
 hardware_interface::CallbackReturn MarkIIHardwareInterface::on_deactivate(const rclcpp_lifecycle::State & /*previous_state*/)
 {
     RCLCPP_INFO(rclcpp::get_logger("MarkIIHardwareInterface"), "Deactivating... Please wait.");
-    try {
-        py::list all_servo_ids;
-        for(auto const& [key, val] : single_servo_joints_) all_servo_ids.append(val);
-        for(auto const& [key, val] : dual_servo_joints_) {
-            all_servo_ids.append(val[0]);
-            all_servo_ids.append(val[1]);
+    
+    py::gil_scoped_acquire acquire;
+
+    // --- FIX: Only run deactivation logic if the driver was actually initialized ---
+    if (python_driver_initialized_) {
+        try {
+            py::list all_servo_ids;
+            for(auto const& [key, val] : single_servo_joints_) all_servo_ids.append(val);
+            for(auto const& [key, val] : dual_servo_joints_) {
+                all_servo_ids.append(val[0]);
+                all_servo_ids.append(val[1]);
+            }
+            for (const auto id : all_servo_ids) {
+                driver_.attr("set_torque_enable")(id, false);
+            }
+            driver_.attr("close")();
+            
+        } catch (const py::error_already_set& e) {
+            RCLCPP_ERROR(rclcpp::get_logger("MarkIIHardwareInterface"), "Python error on deactivation: %s", e.what());
         }
-        for (const auto id : all_servo_ids) {
-            driver_.attr("set_torque_enable")(id, false);
-        }
-        driver_.attr("close")();
-        py::finalize_interpreter();
-    } catch (const py::error_already_set& e) {
-        RCLCPP_ERROR(rclcpp::get_logger("MarkIIHardwareInterface"), "Python error on deactivation: %s", e.what());
+        python_driver_initialized_ = false; // Reset for next activation
     }
     RCLCPP_INFO(rclcpp::get_logger("MarkIIHardwareInterface"), "System successfully deactivated.");
     return hardware_interface::CallbackReturn::SUCCESS;
 }
 
+// --- The read() and write() functions are already correct, as they use gil_scoped_acquire ---
 hardware_interface::return_type MarkIIHardwareInterface::read(
   const rclcpp::Time & /*time*/,
   const rclcpp::Duration & /*period*/)
 {
-  // 1) Acquire GIL for any Python calls
-  pybind11::gil_scoped_acquire acquire;
+  py::gil_scoped_acquire acquire;
+  
+  // --- FIX: Ensure driver is initialized before use ---
+  _initialize_python_driver();
+  if (!python_driver_initialized_) {
+      return hardware_interface::return_type::ERROR; // Don't proceed if init failed
+  }
 
   try {
-    // 2) Loop over your joints and pull data from the Python driver
     for (size_t i = 0; i < info_.joints.size(); ++i) {
       const auto& joint_name = info_.joints[i].name;
 
-      // Handle mimic joint separately
       if (joint_name == "link7_Slider-9") {
           for (size_t j = 0; j < info_.joints.size(); ++j) {
               if (info_.joints[j].name == "link6_Slider-8") {
@@ -190,19 +225,26 @@ hardware_interface::return_type MarkIIHardwareInterface::read(
           continue;
       }
 
-      int ticks = 0;
+      py::object result;
 
       if (single_servo_joints_.count(joint_name)) {
         int servo_id = single_servo_joints_.at(joint_name);
-        ticks = driver_.attr("get_position")(servo_id).cast<int>();
+        result = driver_.attr("get_position")(servo_id);
       } else if (dual_servo_joints_.count(joint_name)) {
         const auto& ids = dual_servo_joints_.at(joint_name);
-        int ticks1 = driver_.attr("get_position")(ids[0]).cast<int>();
-        // For dual servos, we only need one to determine the position
-        ticks = ticks1;
+        result = driver_.attr("get_position")(ids[0]);
       } else {
-          continue; // Skip joints not in our maps
+          continue;
       }
+
+      if (result.is_none()) {
+        RCLCPP_WARN(
+          rclcpp::get_logger("MarkIIHardwareInterface"),
+          "Failed to read position for joint %s. Skipping update.",
+          joint_name.c_str());
+        continue;
+      }
+      int ticks = result.cast<int>();
 
       if (joint_name == "link6_Slider-8") {
         hw_states_[i] = _convert_ticks_to_gripper_dist(ticks);
@@ -224,7 +266,14 @@ hardware_interface::return_type MarkIIHardwareInterface::read(
 
 hardware_interface::return_type MarkIIHardwareInterface::write(const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-    pybind11::gil_scoped_acquire acquire;
+    py::gil_scoped_acquire acquire;
+
+    // --- FIX: Ensure driver is initialized before use ---
+    _initialize_python_driver();
+    if (!python_driver_initialized_) {
+        return hardware_interface::return_type::ERROR; // Don't proceed if init failed
+    }
+
     try
     {
         py::dict commands_to_sync;
@@ -242,7 +291,7 @@ hardware_interface::return_type MarkIIHardwareInterface::write(const rclcpp::Tim
             } else if (calibration_.count(joint_name)) {
                 position_ticks = _convert_rad_to_ticks(hw_commands_[i], joint_name);
             } else {
-                continue; // Skip joints without calibration (like mimic)
+                continue;
             }
 
             if (single_servo_joints_.count(joint_name)) {
@@ -300,6 +349,7 @@ int MarkIIHardwareInterface::_convert_gripper_dist_to_ticks(double dist) {
     dist = std::max(min_dist, std::min(dist, max_dist));
     return static_cast<int>(min_ticks + ((dist - min_dist) / (max_dist - min_dist)) * (max_ticks - min_ticks));
 }
+
 
 } // namespace mark_ii_hardware_interface
 
