@@ -117,7 +117,8 @@ void MarkIIHardwareInterface::_initialize_python_driver()
             }
         }
         
-        auto sts_driver_module = py::module_::import("mark_ii_hardware_interface.sts_driver");
+        // --- FIX: Import the module from its new, correct package ---
+        auto sts_driver_module = py::module_::import("sts_driver_py.sts_driver");
         driver_ = sts_driver_module.attr("ServoController")(serial_port_, baudrate_);
         RCLCPP_INFO(rclcpp::get_logger("MarkIIHardwareInterface"), "Python driver loaded and connected successfully.");
 

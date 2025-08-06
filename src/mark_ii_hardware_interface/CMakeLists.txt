@@ -46,9 +46,6 @@ ament_target_dependencies(${PROJECT_NAME} PUBLIC
   rclcpp_lifecycle
 )
 
-ament_python_install_package(mark_ii_hardware_interface)
-
-
 # Install the compiled C++ library
 install(TARGETS ${PROJECT_NAME}
   ARCHIVE DESTINATION lib
@@ -59,6 +56,9 @@ install(TARGETS ${PROJECT_NAME}
 # ---- THIS IS THE CRITICAL CHANGE ----
 # Explicitly export the plugin description file so pluginlib can find it
 pluginlib_export_plugin_description_file(hardware_interface plugin_description.xml)
+
+# Add this line to ensure python environment is set up
+ament_python_install_package(${PROJECT_NAME})
 
 # Install config and launch files
 install(

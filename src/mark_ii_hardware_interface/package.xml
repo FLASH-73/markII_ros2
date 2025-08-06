@@ -16,10 +16,14 @@
   <depend>rclcpp_lifecycle</depend>
   <depend>pybind11_vendor</depend>
 
+  <exec_depend>sts_driver_py</exec_depend>
+
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
 
   <export>
     <build_type>ament_cmake</build_type>
+    <!-- ADD THIS LINE TO EXPORT THE PLUGIN -->
+    <hardware_interface plugin="${prefix}/plugin_description.xml"/>
   </export>
 </package>

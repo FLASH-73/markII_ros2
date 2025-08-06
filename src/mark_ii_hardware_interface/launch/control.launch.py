@@ -4,9 +4,10 @@ from launch.event_handlers import OnProcessExit
 from launch.substitutions import Command, FindExecutable, PathJoinSubstitution, LaunchConfiguration
 from launch_ros.actions import Node
 from launch_ros.substitutions import FindPackageShare
-# Import for IncludeLaunchDescription
+# Import for IncludeLaunchDescription and IfCondition
 from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from launch.conditions import IfCondition
 
 def generate_launch_description():
     # Declare a launch argument to control whether MoveIt is started
@@ -76,12 +77,13 @@ def generate_launch_description():
     moveit_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
             PathJoinSubstitution([
-                FindPackageShare('MarkII_urdf_moveit_config'),
+                FindPackageShare('mark_ii_urdf_moveit_config'),
                 'launch',
-                'moveit.launch.py'
+                # --- THIS IS THE FIX: The correct file is demo.launch.py ---
+                'demo.launch.py'
             ])
         ),
-        condition_if_not_equal=LaunchConfiguration('launch_moveit', default='false')
+        condition=IfCondition(LaunchConfiguration('launch_moveit'))
     )
 
 
